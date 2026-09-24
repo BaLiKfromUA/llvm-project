@@ -129,6 +129,11 @@ infrastructure are described first, followed by tool-specific sections.
 
 #### New checks
 
+- New {doc}`bugprone-unchecked-expected-access
+  <clang-tidy/checks/bugprone/unchecked-expected-access>` check.
+
+  FIXME: Write a short description.
+
 - New {doc}`llvm-invalid-regex-pattern
   <clang-tidy/checks/llvm/invalid-regex-pattern>` check.
 
