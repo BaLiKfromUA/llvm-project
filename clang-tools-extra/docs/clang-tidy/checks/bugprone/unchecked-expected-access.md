@@ -69,10 +69,16 @@ void i(std::expected<int, Error> e) {
   if (!e)
     report(e.error());
 }
+
+int j(std::expected<int, Error> e) {
+  if (!e)
+    e.emplace(0);
+  return *e;
+}
 ```
 
 ## Limitations
 
-The check does not yet model the constructors, assignment operators,
-`emplace` or `swap` of `std::expected`, so it does not know, for example,
-that a default-constructed `std::expected` holds a value.
+The check does not yet model the constructors, assignment operators or
+`swap` of `std::expected`, so it does not know, for example, that a
+default-constructed `std::expected` holds a value.

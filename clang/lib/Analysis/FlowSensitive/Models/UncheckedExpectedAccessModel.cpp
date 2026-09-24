@@ -71,6 +71,17 @@ BoolValue *getHasValue(Environment &Env, RecordStorageLocation *ExpectedLoc) {
   return HasValueVal;
 }
 
+/// Sets `HasValueVal` as the symbolic value that represents the "has_value"
+/// property of the expected at `ExpectedLoc`. Does nothing if `ExpectedLoc` is
+/// null or is not the location of a `std::expected` object (e.g. of a derived
+/// class object).
+void setHasValue(RecordStorageLocation *ExpectedLoc, BoolValue &HasValueVal,
+                 Environment &Env) {
+  if (ExpectedLoc == nullptr || !isExpectedType(ExpectedLoc->getType()))
+    return;
+  Env.setValue(locForHasValue(*ExpectedLoc), HasValueVal);
+}
+
 void transferHasValueCall(const CXXMemberCallExpr *E,
                           const MatchFinder::MatchResult &,
                           LatticeTransferState &State) {
@@ -79,13 +90,24 @@ void transferHasValueCall(const CXXMemberCallExpr *E,
     State.Env.setValue(*E, *HasValueVal);
 }
 
-// FIXME: Model the constructors, assignments, `emplace` and `swap`.
+void transferEmplaceCall(const CXXMemberCallExpr *E,
+                         const MatchFinder::MatchResult &,
+                         LatticeTransferState &State) {
+  // Every `emplace` overload leaves the expected holding a value.
+  setHasValue(getImplicitObjectLocation(*E, State.Env),
+              State.Env.getBoolLiteralValue(true), State.Env);
+}
+
+// FIXME: Model the constructors, assignments and `swap`.
 auto buildTransferMatchSwitch() {
   return CFGMatchSwitchBuilder<LatticeTransferState>()
       // expected::has_value, expected::operator bool
       .CaseOfCFGStmt<CXXMemberCallExpr>(
           expectedMemberCall(hasAnyName("has_value", "operator bool")),
           transferHasValueCall)
+      // expected::emplace
+      .CaseOfCFGStmt<CXXMemberCallExpr>(expectedMemberCall(hasName("emplace")),
+                                        transferEmplaceCall)
       .Build();
 }
 
