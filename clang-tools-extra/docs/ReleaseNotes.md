@@ -132,7 +132,8 @@ infrastructure are described first, followed by tool-specific sections.
 - New {doc}`bugprone-unchecked-expected-access
   <clang-tidy/checks/bugprone/unchecked-expected-access>` check.
 
-  FIXME: Write a short description.
+  Finds accesses to the value of a `std::expected` object that are not
+  guarded by a check that the object holds a value.
 
 - New {doc}`llvm-invalid-regex-pattern
   <clang-tidy/checks/llvm/invalid-regex-pattern>` check.

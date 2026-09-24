@@ -7,26 +7,57 @@
 //===----------------------------------------------------------------------===//
 
 #include "UncheckedExpectedAccessCheck.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-
-using namespace clang::ast_matchers;
+#include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/Analysis/FlowSensitive/DataflowAnalysis.h"
+#include "clang/Analysis/FlowSensitive/Models/UncheckedExpectedAccessModel.h"
+#include "clang/Basic/SourceLocation.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Error.h"
 
 namespace clang::tidy::bugprone {
+using ast_matchers::MatchFinder;
+using dataflow::UncheckedExpectedAccessDiagnoser;
+using dataflow::UncheckedExpectedAccessModel;
+
+static constexpr StringRef FuncID = "fun";
 
 void UncheckedExpectedAccessCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+  using namespace ast_matchers;
+
+  const auto HasExpectedCallDescendant =
+      hasDescendant(UncheckedExpectedAccessModel::callToExpectedClass());
+  Finder->addMatcher(
+      decl(anyOf(functionDecl(
+                     // FIXME: Remove the filter below when lambdas are
+                     // well supported by the check.
+                     unless(hasDeclContext(cxxRecordDecl(isLambda()))),
+                     hasBody(HasExpectedCallDescendant)),
+                 cxxConstructorDecl(hasAnyConstructorInitializer(
+                     withInitializer(HasExpectedCallDescendant)))))
+          .bind(FuncID),
+      this);
 }
 
-void UncheckedExpectedAccessCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (!MatchedDecl->getIdentifier() || MatchedDecl->getName().starts_with("awesome_"))
+void UncheckedExpectedAccessCheck::check(
+    const MatchFinder::MatchResult &Result) {
+  if (Result.SourceManager->getDiagnostics().hasUncompilableErrorOccurred())
     return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
-  diag(MatchedDecl->getLocation(), "insert 'awesome'", DiagnosticIDs::Note);
+
+  const auto *FuncDecl = Result.Nodes.getNodeAs<FunctionDecl>(FuncID);
+  if (FuncDecl->isTemplated())
+    return;
+
+  UncheckedExpectedAccessDiagnoser Diagnoser;
+  if (llvm::Expected<SmallVector<SourceLocation>> Locs =
+          dataflow::diagnoseFunction<UncheckedExpectedAccessModel,
+                                     SourceLocation>(*FuncDecl, *Result.Context,
+                                                     Diagnoser))
+    for (const SourceLocation &Loc : *Locs)
+      diag(Loc, "unchecked access to 'std::expected' value");
+  else
+    llvm::consumeError(Locs.takeError());
 }
 
 } // namespace clang::tidy::bugprone

@@ -3,4 +3,61 @@
 
 # bugprone-unchecked-expected-access
 
-FIXME: Describe what patterns does the check detect and why. Give examples.
+*Note*: This check uses a flow-sensitive static analysis to produce its
+results. Therefore, it may be more resource intensive (RAM, CPU) than the
+average clang-tidy check.
+
+This check identifies unsafe accesses to values contained in
+`std::expected<T, E>` objects.
+
+An access to the value of a `std::expected<T, E>` occurs when one of its
+`value`, `operator*`, or `operator->` member functions is invoked. The check
+considers these member functions as equivalent, even though `value` throws
+`std::bad_expected_access` while `operator*` and `operator->` have undefined
+behavior when the object holds an error.
+
+An access to the value of a `std::expected<T, E>` is considered safe if and
+only if code in the local scope (for example, a function body) ensures that
+the object holds a value in all possible execution paths that can reach the
+access. That should happen through an explicit check, using the `has_value`
+member function or the conversion to `bool`.
+
+## Unsafe access patterns
+
+```cpp
+void f(std::expected<int, Error> e) {
+  use(*e); // unsafe: it is unclear whether `e` holds a value.
+}
+
+void g(std::expected<int, Error> e) {
+  if (!e) {
+    use(e.value()); // unsafe: `e` holds an error here.
+  }
+}
+```
+
+## Safe access patterns
+
+```cpp
+void f(std::expected<int, Error> e) {
+  if (e.has_value()) {
+    use(*e);
+  }
+}
+
+void g(std::expected<int, Error> e) {
+  if (!e)
+    return;
+  use(e.value());
+}
+
+int h(std::expected<int, Error> e) {
+  return e ? *e : 0;
+}
+```
+
+## Limitations
+
+The check does not yet model the constructors, assignment operators,
+`emplace` or `swap` of `std::expected`, so it does not know, for example,
+that a default-constructed `std::expected` holds a value.

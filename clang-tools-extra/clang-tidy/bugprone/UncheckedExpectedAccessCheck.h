@@ -13,7 +13,8 @@
 
 namespace clang::tidy::bugprone {
 
-/// FIXME: Write a short description.
+/// Warns when the code is accessing the value of a `std::expected<T, E>`
+/// object without assuring that it contains a value.
 ///
 /// For the user-facing documentation see:
 /// https://clang.llvm.org/extra/clang-tidy/checks/bugprone/unchecked-expected-access.html
