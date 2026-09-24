@@ -271,3 +271,81 @@ void void_error_access_after_emplace(std::expected<void, int> e) {
   e.error();
   // CHECK-MESSAGES: :[[@LINE-1]]:5: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
 }
+
+// Comparison of two expected objects.
+
+int equal_to_expected_with_value(std::expected<int, int> a,
+                                 std::expected<int, int> b) {
+  if (a == b && b)
+    return *a;
+  return 0;
+}
+
+int equal_to_expected_with_error(std::expected<int, int> a,
+                                 std::expected<int, int> b) {
+  if (a == b && !b)
+    return a.error();
+  return 0;
+}
+
+int equal_then_check_other(std::expected<int, int> a,
+                           std::expected<int, int> b) {
+  if (a == b) {
+    if (b)
+      return *a;
+  }
+  return 0;
+}
+
+int not_not_equal_to_expected_with_value(std::expected<int, int> a,
+                                         std::expected<int, int> b) {
+  if (a != b)
+    return 0;
+  if (b)
+    return *a;
+  return 0;
+}
+
+int equal_to_expected_with_other_value_type(std::expected<int, int> a,
+                                            std::expected<long, int> b) {
+  if (a == b && b)
+    return *a;
+  return 0;
+}
+
+void void_not_equal_to_expected_with_value(std::expected<void, int> a,
+                                           std::expected<void, int> b) {
+  if (a != b && a)
+    b.error();
+}
+
+int equal_to_unchecked_expected(std::expected<int, int> a,
+                                std::expected<int, int> b) {
+  if (a == b)
+    return *a;
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+int not_equal_to_expected_with_value(std::expected<int, int> a,
+                                     std::expected<int, int> b) {
+  if (a != b && b)
+    return *a;
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+void not_equal_values_may_differ(std::expected<int, int> a,
+                                 std::expected<int, int> b) {
+  if (a != b && a)
+    b.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:7: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+}
+
+int equal_or_other_has_value(std::expected<int, int> a,
+                             std::expected<int, int> b) {
+  if (a == b || b)
+    return *a;
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+  return 0;
+}

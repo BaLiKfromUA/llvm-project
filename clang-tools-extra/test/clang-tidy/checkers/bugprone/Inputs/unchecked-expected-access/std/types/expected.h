@@ -77,6 +77,9 @@ public:
   template <class... Args> T &emplace(Args &&...args) noexcept;
 
   void swap(expected &rhs) noexcept;
+
+  template <class T2, class E2>
+  friend bool operator==(const expected &x, const expected<T2, E2> &y);
 };
 
 template <class E> class expected<void, E> {
@@ -117,6 +120,9 @@ public:
   void emplace() noexcept;
 
   void swap(expected &rhs) noexcept;
+
+  template <class T2, class E2>
+  friend bool operator==(const expected &x, const expected<T2, E2> &y);
 };
 
 } // namespace std
