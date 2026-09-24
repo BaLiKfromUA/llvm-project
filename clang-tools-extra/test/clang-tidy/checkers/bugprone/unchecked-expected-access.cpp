@@ -216,3 +216,58 @@ void unexpected_error_is_not_diagnosed() {
   std::unexpected<int> u(1);
   u.error();
 }
+
+// emplace.
+
+void emplace_then_access(std::expected<int, int> e) {
+  e.emplace(1);
+  e.value();
+  *e;
+}
+
+void emplace_then_arrow_access(std::expected<Foo, int> e) {
+  e.emplace();
+  e->foo();
+}
+
+int emplace_if_empty(std::expected<int, int> e) {
+  if (!e)
+    e.emplace(0);
+  return *e;
+}
+
+int emplace_through_pointer(std::expected<int, int> *p) {
+  p->emplace(1);
+  return **p;
+}
+
+void void_emplace_then_access(std::expected<void, int> e) {
+  e.emplace();
+  e.value();
+}
+
+void error_access_after_emplace(std::expected<int, int> e) {
+  e.emplace(1);
+  e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:5: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+}
+
+int emplace_on_other_object(std::expected<int, int> a,
+                            std::expected<int, int> b) {
+  a.emplace(1);
+  return *b;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+int emplace_on_one_path(std::expected<int, int> e, bool cond) {
+  if (cond)
+    e.emplace(1);
+  return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+void void_error_access_after_emplace(std::expected<void, int> e) {
+  e.emplace();
+  e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:5: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+}
