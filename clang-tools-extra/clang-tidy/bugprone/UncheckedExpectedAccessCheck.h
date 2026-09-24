@@ -13,8 +13,9 @@
 
 namespace clang::tidy::bugprone {
 
-/// Warns when the code is accessing the value of a `std::expected<T, E>`
-/// object without assuring that it contains a value.
+/// Warns when the code is accessing the value (or error) of a
+/// `std::expected<T, E>` object without assuring that it contains a value
+/// (or error).
 ///
 /// For the user-facing documentation see:
 /// https://clang.llvm.org/extra/clang-tidy/checks/bugprone/unchecked-expected-access.html

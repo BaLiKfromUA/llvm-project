@@ -7,7 +7,7 @@
 results. Therefore, it may be more resource intensive (RAM, CPU) than the
 average clang-tidy check.
 
-This check identifies unsafe accesses to values contained in
+This check identifies unsafe accesses to values and errors contained in
 `std::expected<T, E>` objects.
 
 An access to the value of a `std::expected<T, E>` occurs when one of its
@@ -22,6 +22,12 @@ the object holds a value in all possible execution paths that can reach the
 access. That should happen through an explicit check, using the `has_value`
 member function or the conversion to `bool`.
 
+Likewise, an access to the error of a `std::expected<T, E>` occurs when its
+`error` member function is invoked, which has undefined behavior when the
+object holds a value. Such an access is considered safe if and only if code in
+the local scope ensures that the object does *not* hold a value in all
+possible execution paths that can reach the access.
+
 ## Unsafe access patterns
 
 ```cpp
@@ -33,6 +39,10 @@ void g(std::expected<int, Error> e) {
   if (!e) {
     use(e.value()); // unsafe: `e` holds an error here.
   }
+}
+
+void h(std::expected<int, Error> e) {
+  report(e.error()); // unsafe: it is unclear whether `e` holds an error.
 }
 ```
 
@@ -53,6 +63,11 @@ void g(std::expected<int, Error> e) {
 
 int h(std::expected<int, Error> e) {
   return e ? *e : 0;
+}
+
+void i(std::expected<int, Error> e) {
+  if (!e)
+    report(e.error());
 }
 ```
 

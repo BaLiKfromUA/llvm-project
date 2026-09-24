@@ -13,12 +13,14 @@
 #include "clang/Analysis/FlowSensitive/DataflowAnalysis.h"
 #include "clang/Analysis/FlowSensitive/Models/UncheckedExpectedAccessModel.h"
 #include "clang/Basic/SourceLocation.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Error.h"
 
 namespace clang::tidy::bugprone {
 using ast_matchers::MatchFinder;
 using dataflow::UncheckedExpectedAccessDiagnoser;
+using dataflow::UncheckedExpectedAccessDiagnostic;
 using dataflow::UncheckedExpectedAccessModel;
 
 static constexpr StringRef FuncID = "fun";
@@ -50,14 +52,16 @@ void UncheckedExpectedAccessCheck::check(
     return;
 
   UncheckedExpectedAccessDiagnoser Diagnoser;
-  if (llvm::Expected<SmallVector<SourceLocation>> Locs =
+  if (llvm::Expected<SmallVector<UncheckedExpectedAccessDiagnostic>> Diags =
           dataflow::diagnoseFunction<UncheckedExpectedAccessModel,
-                                     SourceLocation>(*FuncDecl, *Result.Context,
-                                                     Diagnoser))
-    for (const SourceLocation &Loc : *Locs)
-      diag(Loc, "unchecked access to 'std::expected' value");
+                                     UncheckedExpectedAccessDiagnostic>(
+              *FuncDecl, *Result.Context, Diagnoser))
+    for (const UncheckedExpectedAccessDiagnostic &Diag : *Diags)
+      diag(Diag.Loc,
+           "unchecked access to 'std::expected' %select{value|error}0")
+          << llvm::to_underlying(Diag.Kind);
   else
-    llvm::consumeError(Locs.takeError());
+    llvm::consumeError(Diags.takeError());
 }
 
 } // namespace clang::tidy::bugprone
