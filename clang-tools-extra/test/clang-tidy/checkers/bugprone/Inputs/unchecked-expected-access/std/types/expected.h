@@ -90,6 +90,9 @@ public:
   template <class T2>
     requires(!__is_expected<T2>)
   friend bool operator==(const expected &x, const T2 &v);
+
+  template <class E2>
+  friend bool operator==(const expected &x, const unexpected<E2> &e);
 };
 
 template <class E> class expected<void, E> {
@@ -133,6 +136,9 @@ public:
 
   template <class T2, class E2>
   friend bool operator==(const expected &x, const expected<T2, E2> &y);
+
+  template <class E2>
+  friend bool operator==(const expected &x, const unexpected<E2> &e);
 };
 
 } // namespace std

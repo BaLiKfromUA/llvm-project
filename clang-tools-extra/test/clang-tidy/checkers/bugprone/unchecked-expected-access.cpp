@@ -410,3 +410,55 @@ int equal_to_value_or_other(std::expected<int, int> e, bool cond) {
   // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
   return 0;
 }
+
+// Comparison of expected with an unexpected.
+
+int equal_to_unexpected(std::expected<int, int> e) {
+  if (e == std::unexpected(1))
+    return e.error();
+  return 0;
+}
+
+int unexpected_equal_to_expected(std::expected<int, int> e) {
+  if (std::unexpected(1) == e)
+    return e.error();
+  return 0;
+}
+
+int not_equal_to_unexpected_early_return(std::expected<int, int> e) {
+  if (e != std::unexpected(1))
+    return 0;
+  return e.error();
+}
+
+void void_equal_to_unexpected(std::expected<void, int> e) {
+  if (e == std::unexpected(1))
+    e.error();
+}
+
+int value_access_when_equal_to_unexpected(std::expected<int, int> e) {
+  if (e == std::unexpected(1))
+    return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+int error_access_when_not_equal_to_unexpected(std::expected<int, int> e) {
+  if (e != std::unexpected(1))
+    return e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+int error_access_after_equal_to_unexpected(std::expected<int, int> e) {
+  if (e == std::unexpected(1))
+    return 0;
+  return e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+}
+
+void void_value_access_when_equal_to_unexpected(std::expected<void, int> e) {
+  if (e == std::unexpected(1))
+    e.value();
+  // CHECK-MESSAGES: :[[@LINE-1]]:7: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
