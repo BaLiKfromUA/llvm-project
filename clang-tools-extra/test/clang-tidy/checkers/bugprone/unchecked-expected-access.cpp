@@ -349,3 +349,64 @@ int equal_or_other_has_value(std::expected<int, int> a,
   // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
   return 0;
 }
+
+// Comparison of expected with a value.
+
+int equal_to_value(std::expected<int, int> e) {
+  if (e == 5)
+    return *e;
+  return 0;
+}
+
+int value_equal_to_expected(std::expected<int, int> e) {
+  if (5 == e)
+    return e.value();
+  return 0;
+}
+
+int not_equal_to_value_early_return(std::expected<int, int> e) {
+  if (e != 5)
+    return 0;
+  return *e;
+}
+
+long equal_to_value_of_other_type(std::expected<long, int> e, int v) {
+  if (e == v)
+    return *e;
+  return 0;
+}
+
+int not_equal_to_value(std::expected<int, int> e) {
+  if (e != 5)
+    return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+int not_equal_to_value_after_equal(std::expected<int, int> e) {
+  if (e == 5)
+    return 0;
+  return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+int error_access_when_equal_to_value(std::expected<int, int> e) {
+  if (e == 5)
+    return e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+int error_access_when_not_equal_to_value(std::expected<int, int> e) {
+  if (e != 5)
+    return e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+  return 0;
+}
+
+int equal_to_value_or_other(std::expected<int, int> e, bool cond) {
+  if (e == 5 || cond)
+    return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+  return 0;
+}

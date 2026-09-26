@@ -26,6 +26,12 @@ struct unexpect_t {
 
 inline constexpr unexpect_t unexpect{};
 
+template <class T, class E> class expected;
+
+template <class> constexpr bool __is_expected = false;
+template <class T, class E>
+constexpr bool __is_expected<expected<T, E>> = true;
+
 template <class T, class E> class expected {
 public:
   using value_type = T;
@@ -80,6 +86,10 @@ public:
 
   template <class T2, class E2>
   friend bool operator==(const expected &x, const expected<T2, E2> &y);
+
+  template <class T2>
+    requires(!__is_expected<T2>)
+  friend bool operator==(const expected &x, const T2 &v);
 };
 
 template <class E> class expected<void, E> {
