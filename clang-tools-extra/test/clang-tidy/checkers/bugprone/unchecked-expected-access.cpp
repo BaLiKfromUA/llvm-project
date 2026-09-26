@@ -1,6 +1,7 @@
 // RUN: %check_clang_tidy -std=c++23-or-later %s bugprone-unchecked-expected-access %t -- -- -I %S/Inputs/unchecked-expected-access
 
 #include "std/types/expected.h"
+#include <utility>
 
 struct Foo {
   void foo() const {}
@@ -461,4 +462,141 @@ void void_value_access_when_equal_to_unexpected(std::expected<void, int> e) {
   if (e == std::unexpected(1))
     e.value();
   // CHECK-MESSAGES: :[[@LINE-1]]:7: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+// Construction.
+
+int default_construct() {
+  std::expected<int, int> e;
+  return *e;
+}
+
+int value_initialize() {
+  std::expected<int, int> e{};
+  return e.value();
+}
+
+int construct_from_value() {
+  std::expected<int, int> e(5);
+  return *e;
+}
+
+int copy_initialize_from_value() {
+  std::expected<int, int> e = 5;
+  return *e;
+}
+
+void construct_in_place() {
+  std::expected<Foo, int> e(std::in_place);
+  e->foo();
+}
+
+void void_default_construct() {
+  std::expected<void, int> e;
+  e.value();
+}
+
+void void_construct_in_place() {
+  std::expected<void, int> e(std::in_place);
+  e.value();
+}
+
+int construct_temporary_from_value() {
+  return std::expected<int, int>(5).value();
+}
+
+int construct_from_unexpected_rvalue() {
+  std::expected<int, int> e(std::unexpected(1));
+  return e.error();
+}
+
+int construct_from_unexpected_lvalue() {
+  const std::unexpected<int> u(1);
+  std::expected<int, int> e(u);
+  return e.error();
+}
+
+int copy_initialize_from_unexpected() {
+  std::expected<int, int> e = std::unexpected(1);
+  return e.error();
+}
+
+int construct_unexpect() {
+  std::expected<int, int> e(std::unexpect, 1);
+  return e.error();
+}
+
+void void_construct_unexpect() {
+  std::expected<void, int> e(std::unexpect, 1);
+  e.error();
+}
+
+int convert_from_checked(std::expected<long, int> b) {
+  if (!b)
+    return 0;
+  std::expected<int, int> a(b);
+  return *a;
+}
+
+int copy_construct_from_checked(std::expected<int, int> b) {
+  if (!b)
+    return 0;
+  auto a = b;
+  return *a;
+}
+
+int move_construct_from_checked(std::expected<int, int> b) {
+  if (!b)
+    return 0;
+  auto a = std::move(b);
+  return *a;
+}
+
+int error_access_after_default_construct() {
+  std::expected<int, int> e;
+  return e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+}
+
+int error_access_after_construct_from_value() {
+  std::expected<int, int> e(5);
+  return e.error();
+  // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: unchecked access to 'std::expected' error [bugprone-unchecked-expected-access]
+}
+
+int value_access_after_construct_from_unexpected() {
+  std::expected<int, int> e(std::unexpected(1));
+  return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+int value_access_after_construct_unexpect() {
+  std::expected<int, int> e(std::unexpect, 1);
+  return *e;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+void void_value_access_after_construct_unexpect() {
+  std::expected<void, int> e(std::unexpect, 1);
+  e.value();
+  // CHECK-MESSAGES: :[[@LINE-1]]:5: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+int convert_from_unchecked(std::expected<long, int> b) {
+  std::expected<int, int> a(b);
+  return *a;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+int copy_construct_from_unchecked(std::expected<int, int> b) {
+  auto a = b;
+  return *a;
+  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: unchecked access to 'std::expected' value [bugprone-unchecked-expected-access]
+}
+
+// FIXME: should warn once converting assignments are modeled.
+int default_construct_then_assign_unexpected() {
+  std::expected<int, int> e;
+  e = std::unexpected(1);
+  return *e;
 }

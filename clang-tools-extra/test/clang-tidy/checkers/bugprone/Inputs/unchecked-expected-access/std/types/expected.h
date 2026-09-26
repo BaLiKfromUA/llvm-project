@@ -3,6 +3,10 @@
 
 /// Mock of `std::expected`.
 // TODO: move to checkers/Inputs/Headers/std/expected?
+
+// For `std::in_place_t` and `std::in_place`.
+#include <type_traits>
+
 namespace std {
 
 template <class E> class unexpected {
@@ -32,6 +36,22 @@ template <class> constexpr bool __is_expected = false;
 template <class T, class E>
 constexpr bool __is_expected<expected<T, E>> = true;
 
+template <class> constexpr bool __is_unexpected = false;
+template <class E> constexpr bool __is_unexpected<unexpected<E>> = true;
+
+// `__remove_cvref` is a clang builtin, so the helper has a different name.
+// clang-format off
+template <class T> struct __remove_cvref_impl              { using type = T; };
+template <class T> struct __remove_cvref_impl<const T>     { using type = T; };
+template <class T> struct __remove_cvref_impl<T &>         { using type = T; };
+template <class T> struct __remove_cvref_impl<const T &>   { using type = T; };
+template <class T> struct __remove_cvref_impl<T &&>        { using type = T; };
+template <class T> struct __remove_cvref_impl<const T &&>  { using type = T; };
+// clang-format on
+
+template <class T>
+using __remove_cvref_t = typename __remove_cvref_impl<T>::type;
+
 template <class T, class E> class expected {
 public:
   using value_type = T;
@@ -42,16 +62,28 @@ public:
   expected(const expected &);
   expected(expected &&) noexcept;
 
-  template <class U = T> expected(U &&v);
+  template <class U, class G> expected(const expected<U, G> &x);
+  template <class U, class G> expected(expected<U, G> &&x);
+
+  template <class U = T>
+    requires(!__is_expected<__remove_cvref_t<U>> &&
+             !__is_same(__remove_cvref_t<U>, in_place_t) &&
+             !__is_same(__remove_cvref_t<U>, unexpect_t) &&
+             !__is_unexpected<__remove_cvref_t<U>>)
+  expected(U &&v);
 
   template <class G> expected(const unexpected<G> &e);
   template <class G> expected(unexpected<G> &&e);
+
+  template <class... Args> explicit expected(in_place_t, Args &&...args);
 
   template <class... Args>
   explicit expected(unexpect_t, Args &&...args);
 
   expected &operator=(const expected &);
   expected &operator=(expected &&) noexcept;
+
+  template <class G> expected &operator=(unexpected<G> &&e);
 
   const T *operator->() const noexcept;
   T *operator->() noexcept;
@@ -105,8 +137,13 @@ public:
   expected(const expected &);
   expected(expected &&) noexcept;
 
+  template <class U, class G> expected(const expected<U, G> &x);
+  template <class U, class G> expected(expected<U, G> &&x);
+
   template <class G> expected(const unexpected<G> &e);
   template <class G> expected(unexpected<G> &&e);
+
+  explicit expected(in_place_t) noexcept;
 
   template <class... Args>
   explicit expected(unexpect_t, Args &&...args);
