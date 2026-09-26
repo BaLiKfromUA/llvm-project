@@ -75,6 +75,12 @@ int j(std::expected<int, Error> e) {
     e.emplace(0);
   return *e;
 }
+
+int k(std::expected<int, Error> a, std::expected<int, Error> b) {
+  if (a == b && b)
+    return *a; // equal objects either both hold a value or both an error.
+  return 0;
+}
 ```
 
 ## Limitations
