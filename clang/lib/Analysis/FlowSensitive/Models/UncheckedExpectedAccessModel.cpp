@@ -54,6 +54,11 @@ using LatticeTransferState = TransferState<NoopLattice>;
 
 AST_MATCHER(CXXRecordDecl, expectedClass) { return isExpectedClass(Node); }
 
+AST_MATCHER(CXXRecordDecl, unexpectedClass) {
+  return Node.getDeclName().isIdentifier() && Node.getName() == "unexpected" &&
+         Node.getDeclContext()->isStdNamespace();
+}
+
 auto expectedMemberCall(ast_matchers::internal::Matcher<NamedDecl> Name) {
   return cxxMemberCallExpr(
       callee(cxxMethodDecl(Name, ofClass(expectedClass()))));
@@ -69,10 +74,32 @@ auto hasExpectedType() {
       recordType(hasDeclaration(cxxRecordDecl(expectedClass())))));
 }
 
+auto hasUnexpectedType() {
+  return hasType(hasUnqualifiedDesugaredType(
+      recordType(hasDeclaration(cxxRecordDecl(unexpectedClass())))));
+}
+
 auto expectedEqualityCall() {
   return cxxOperatorCallExpr(
       hasOverloadedOperatorName("=="), argumentCountIs(2),
       hasArgument(0, hasExpectedType()), hasArgument(1, hasExpectedType()));
+}
+
+// Reversed comparisons (`v == e`) are rewritten to `e == v`, so the expected is
+// always the first argument.
+auto expectedValueEqualityCall() {
+  return cxxOperatorCallExpr(
+      hasOverloadedOperatorName("=="), argumentCountIs(2),
+      hasArgument(0, hasExpectedType()),
+      hasArgument(1, unless(anyOf(hasExpectedType(), hasUnexpectedType()))));
+}
+
+// Reversed comparisons (`u == e`) are rewritten to `e == u`, so the expected is
+// always the first argument.
+auto expectedUnexpectedEqualityCall() {
+  return cxxOperatorCallExpr(
+      hasOverloadedOperatorName("=="), argumentCountIs(2),
+      hasArgument(0, hasExpectedType()), hasArgument(1, hasUnexpectedType()));
 }
 
 /// Ensures that `E` is mapped to a `BoolValue` and returns its formula.
@@ -159,6 +186,35 @@ void transferExpectedEqualityCall(const CXXOperatorCallExpr *E,
     Env.assume(A.makeImplies(A.makeAnd(LHasValue, RHasValue), EqVal));
 }
 
+void transferExpectedValueEqualityCall(const CXXOperatorCallExpr *E,
+                                       const MatchFinder::MatchResult &,
+                                       LatticeTransferState &State) {
+  Environment &Env = State.Env;
+  BoolValue *HasValueVal =
+      getHasValue(Env, Env.get<RecordStorageLocation>(*E->getArg(0)));
+  if (HasValueVal == nullptr)
+    return;
+
+  // `e == v` --> `e.has_value() && *e == v`
+  Env.assume(
+      Env.arena().makeImplies(forceBoolValue(Env, *E), HasValueVal->formula()));
+}
+
+void transferExpectedUnexpectedEqualityCall(const CXXOperatorCallExpr *E,
+                                            const MatchFinder::MatchResult &,
+                                            LatticeTransferState &State) {
+  Environment &Env = State.Env;
+  BoolValue *HasValueVal =
+      getHasValue(Env, Env.get<RecordStorageLocation>(*E->getArg(0)));
+  if (HasValueVal == nullptr)
+    return;
+
+  // `e == u` --> `!e.has_value() && e.error() == u.error()`
+  Arena &A = Env.arena();
+  Env.assume(A.makeImplies(forceBoolValue(Env, *E),
+                           A.makeNot(HasValueVal->formula())));
+}
+
 // FIXME: Model the constructors, assignments and `swap`.
 auto buildTransferMatchSwitch() {
   return CFGMatchSwitchBuilder<LatticeTransferState>()
@@ -172,6 +228,13 @@ auto buildTransferMatchSwitch() {
       // operator== between two expecteds
       .CaseOfCFGStmt<CXXOperatorCallExpr>(expectedEqualityCall(),
                                           transferExpectedEqualityCall)
+      // operator== between an expected and a value
+      .CaseOfCFGStmt<CXXOperatorCallExpr>(expectedValueEqualityCall(),
+                                          transferExpectedValueEqualityCall)
+      // operator== between an expected and an unexpected
+      .CaseOfCFGStmt<CXXOperatorCallExpr>(
+          expectedUnexpectedEqualityCall(),
+          transferExpectedUnexpectedEqualityCall)
       .Build();
 }
 

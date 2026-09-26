@@ -81,6 +81,18 @@ int k(std::expected<int, Error> a, std::expected<int, Error> b) {
     return *a; // equal objects either both hold a value or both an error.
   return 0;
 }
+
+int l(std::expected<int, Error> e) {
+  if (e == 42)
+    return *e; // only an expected holding a value compares equal to a value.
+  return 0;
+}
+
+void m(std::expected<int, Error> e) {
+  if (e == std::unexpected(Error::NotFound))
+    report(e.error()); // only an expected holding an error compares equal
+                       // to an unexpected.
+}
 ```
 
 ## Limitations
