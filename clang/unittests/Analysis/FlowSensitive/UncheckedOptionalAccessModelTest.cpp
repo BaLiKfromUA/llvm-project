@@ -3016,6 +3016,84 @@ TEST_P(UncheckedOptionalAccessTest, AssertFalseGtestMacroWithNullableValue) {
   )cc");
 }
 
+TEST_P(UncheckedOptionalAccessTest, RangeForReferenceCheckedInNestedLoop) {
+  // Regression test for https://github.com/llvm/llvm-project/issues/174250
+  ExpectDiagnosticsFor(R"cc(
+    #include "unchecked_optional_access_test.h"
+
+    struct OptionalRange {
+      struct Iterator {
+        const $ns::$optional<int> &operator*() const;
+        Iterator &operator++();
+        bool operator!=(const Iterator &) const;
+      };
+      Iterator begin();
+      Iterator end();
+    };
+
+    void target(bool b) {
+      for (const auto &opt : OptionalRange()) {
+        if (opt.has_value()) {
+          for (int i = 0; i < 10; ++i) {
+            opt.value();
+          }
+          while (b) {
+            opt.value();
+          }
+        }
+      }
+    }
+  )cc");
+}
+
+TEST_P(UncheckedOptionalAccessTest, RangeForReferenceUncheckedInNestedLoop) {
+  ExpectDiagnosticsFor(R"cc(
+    #include "unchecked_optional_access_test.h"
+
+    struct OptionalRange {
+      struct Iterator {
+        const $ns::$optional<int> &operator*() const;
+        Iterator &operator++();
+        bool operator!=(const Iterator &) const;
+      };
+      Iterator begin();
+      Iterator end();
+    };
+
+    void target() {
+      for (const auto &opt : OptionalRange()) {
+        for (int i = 0; i < 10; ++i) {
+          opt.value(); // [[unsafe]]
+        }
+      }
+    }
+  )cc");
+}
+
+TEST_P(UncheckedOptionalAccessTest,
+       ConstAccessorAfterNonConstCallIsDifferentObject) {
+  // The two `*It` calls return different objects, even though they are calls
+  // to the same method on the same object.
+  ExpectDiagnosticsFor(R"cc(
+    #include "unchecked_optional_access_test.h"
+
+    struct Iterator {
+      const $ns::$optional<int> &operator*() const;
+      Iterator &operator++();
+    };
+
+    void target(Iterator It) {
+      const auto &A = *It;
+      ++It;
+      const auto &B = *It;
+      if (B.has_value()) {
+        A.value(); // [[unsafe]]
+        B.value();
+      }
+    }
+  )cc");
+}
+
 // FIXME: Add support for:
 // - constructors (copy, move)
 // - assignment operators (default, copy, move)

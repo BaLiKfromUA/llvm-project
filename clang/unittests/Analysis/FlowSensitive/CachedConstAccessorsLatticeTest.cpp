@@ -122,7 +122,8 @@ TEST_F(CachedConstAccessorsLatticeTest,
   EXPECT_NE(Val3, Val2);
 }
 
-TEST_F(CachedConstAccessorsLatticeTest, SameLocBeforeClearOrDiffAfterClear) {
+TEST_F(CachedConstAccessorsLatticeTest,
+       SameLocBeforeClearAndReinitializedAfterClear) {
   CommonTestInputs Inputs;
   auto *CE = Inputs.CallRef;
   RecordStorageLocation Loc(Inputs.SType, RecordStorageLocation::FieldToLoc(),
@@ -133,25 +134,27 @@ TEST_F(CachedConstAccessorsLatticeTest, SameLocBeforeClearOrDiffAfterClear) {
   const FunctionDecl *Callee = CE->getDirectCallee();
   ASSERT_NE(Callee, nullptr);
   StorageLocation &Loc1 = Lattice.getOrCreateConstMethodReturnStorageLocation(
-      Loc, Callee, Env, NopInit);
+      Loc, Callee, *CE, Env, NopInit);
   auto NotCalled = [](StorageLocation &) {
     ASSERT_TRUE(false) << "Not reached";
   };
   StorageLocation &Loc2 = Lattice.getOrCreateConstMethodReturnStorageLocation(
-      Loc, Callee, Env, NotCalled);
+      Loc, Callee, *CE, Env, NotCalled);
 
   EXPECT_EQ(&Loc1, &Loc2);
 
   Lattice.clearConstMethodReturnStorageLocations(Loc);
+  // The location is stable, but it is initialized again.
+  bool Initialized = false;
   StorageLocation &Loc3 = Lattice.getOrCreateConstMethodReturnStorageLocation(
-      Loc, Callee, Env, NopInit);
+      Loc, Callee, *CE, Env, [&](StorageLocation &) { Initialized = true; });
 
-  EXPECT_NE(&Loc3, &Loc1);
-  EXPECT_NE(&Loc3, &Loc2);
+  EXPECT_EQ(&Loc3, &Loc1);
+  EXPECT_TRUE(Initialized);
 }
 
 TEST_F(CachedConstAccessorsLatticeTest,
-       SameStructValBeforeClearOrDiffAfterClear) {
+       SameStructValBeforeClearAndReinitializedAfterClear) {
   TestAST AST(R"cpp(
     struct S {
       S structValProperty() const;
@@ -180,21 +183,23 @@ TEST_F(CachedConstAccessorsLatticeTest,
   const FunctionDecl *Callee = CE->getDirectCallee();
   ASSERT_NE(Callee, nullptr);
   StorageLocation &Loc1 = Lattice.getOrCreateConstMethodReturnStorageLocation(
-      Loc, Callee, Env, NopInit);
+      Loc, Callee, *CE, Env, NopInit);
   auto NotCalled = [](StorageLocation &) {
     ASSERT_TRUE(false) << "Not reached";
   };
   StorageLocation &Loc2 = Lattice.getOrCreateConstMethodReturnStorageLocation(
-      Loc, Callee, Env, NotCalled);
+      Loc, Callee, *CE, Env, NotCalled);
 
   EXPECT_EQ(&Loc1, &Loc2);
 
   Lattice.clearConstMethodReturnStorageLocations(Loc);
+  // The location is stable, but it is initialized again.
+  bool Initialized = false;
   StorageLocation &Loc3 = Lattice.getOrCreateConstMethodReturnStorageLocation(
-      Loc, Callee, Env, NopInit);
+      Loc, Callee, *CE, Env, [&](StorageLocation &) { Initialized = true; });
 
-  EXPECT_NE(&Loc3, &Loc1);
-  EXPECT_NE(&Loc3, &Loc1);
+  EXPECT_EQ(&Loc3, &Loc1);
+  EXPECT_TRUE(Initialized);
 }
 
 TEST_F(CachedConstAccessorsLatticeTest, ClearDifferentLocs) {
@@ -210,15 +215,15 @@ TEST_F(CachedConstAccessorsLatticeTest, ClearDifferentLocs) {
   const FunctionDecl *Callee = CE->getDirectCallee();
   ASSERT_NE(Callee, nullptr);
   StorageLocation &RetLoc1 =
-      Lattice.getOrCreateConstMethodReturnStorageLocation(LocS1, Callee, Env,
-                                                          NopInit);
+      Lattice.getOrCreateConstMethodReturnStorageLocation(LocS1, Callee, *CE,
+                                                          Env, NopInit);
   Lattice.clearConstMethodReturnStorageLocations(LocS2);
   auto NotCalled = [](StorageLocation &) {
     ASSERT_TRUE(false) << "Not reached";
   };
   StorageLocation &RetLoc2 =
-      Lattice.getOrCreateConstMethodReturnStorageLocation(LocS1, Callee, Env,
-                                                          NotCalled);
+      Lattice.getOrCreateConstMethodReturnStorageLocation(LocS1, Callee, *CE,
+                                                          Env, NotCalled);
 
   EXPECT_EQ(&RetLoc1, &RetLoc2);
 }

@@ -136,6 +136,15 @@ public:
   /// Returns a stable storage location for `E`.
   StorageLocation &getStableStorageLocation(const Expr &E);
 
+  /// Returns a stable storage location of type `Type` that models the object
+  /// returned by the const method call `E` on the object at `RecordLoc`.
+  ///
+  /// This is a separate mapping from `getStableStorageLocation(E)`, as the
+  /// modeled object need not have the type of `E` (e.g. the pointee of a
+  /// pointer returned by `E`).
+  StorageLocation &getStableStorageLocation(const RecordStorageLocation &RecordLoc,
+                                            const Expr &E, QualType Type);
+
   /// Returns a pointer value that represents a null pointer. Calls with
   /// `PointeeType` that are canonically equivalent will return the same result.
   /// A null `PointeeType` can be used for the pointee of `std::nullptr_t`.
@@ -296,6 +305,9 @@ private:
   // in scope for a particular basic block are stored in `Environment`.
   llvm::DenseMap<const ValueDecl *, StorageLocation *> DeclToLoc;
   llvm::DenseMap<const Expr *, StorageLocation *> ExprToLoc;
+  llvm::DenseMap<std::pair<const RecordStorageLocation *, const Expr *>,
+                 StorageLocation *>
+      ConstMethodCallToLoc;
 
   // Null pointer values, keyed by the canonical pointee type.
   //

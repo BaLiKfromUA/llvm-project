@@ -65,9 +65,14 @@ public:
 
   /// Creates or returns a previously created `StorageLocation` associated with
   /// a const method call `obj.getFoo()` where `RecordLoc` is the
-  /// `RecordStorageLocation` of `obj`, `Callee` is the decl for `getFoo`.
+  /// `RecordStorageLocation` of `obj`, `Callee` is the decl for `getFoo` and
+  /// `CallE` is the call expression.
   ///
-  /// The callback `Initialize` runs on the storage location if newly created.
+  /// If there is no cached location, the location is obtained from
+  /// `DataflowAnalysisContext::getStableStorageLocation(RecordLoc, CallE, ...)`
+  /// so that evaluating the same call again (e.g. in the next iteration of a
+  /// loop) yields the same location. Any values previously stored in it are
+  /// cleared and the callback `Initialize` runs on it.
   ///
   /// Requirements:
   ///
@@ -75,7 +80,8 @@ public:
   ///     record type).
   StorageLocation &getOrCreateConstMethodReturnStorageLocation(
       const RecordStorageLocation &RecordLoc, const FunctionDecl *Callee,
-      Environment &Env, llvm::function_ref<void(StorageLocation &)> Initialize);
+      const Expr &CallE, Environment &Env,
+      llvm::function_ref<void(StorageLocation &)> Initialize);
 
   void clearConstMethodReturnValues(const RecordStorageLocation &RecordLoc) {
     ConstMethodReturnValues.erase(&RecordLoc);
@@ -109,6 +115,22 @@ private:
 };
 
 namespace internal {
+
+/// Removes the values of `Loc` and of all locations nested in it (except those
+/// reached through reference fields) from `Env`.
+inline void clearValuesRecursively(const StorageLocation &Loc,
+                                   Environment &Env) {
+  const auto *RecordLoc = dyn_cast<RecordStorageLocation>(&Loc);
+  if (RecordLoc == nullptr) {
+    Env.clearValue(Loc);
+    return;
+  }
+  for (const auto &[Field, FieldLoc] : RecordLoc->children())
+    if (FieldLoc != nullptr && !Field->getType()->isReferenceType())
+      clearValuesRecursively(*FieldLoc, Env);
+  for (const auto &Entry : RecordLoc->synthetic_fields())
+    clearValuesRecursively(*Entry.getValue(), Env);
+}
 
 template <typename T>
 llvm::SmallDenseMap<const RecordStorageLocation *,
@@ -196,7 +218,8 @@ template <typename Base>
 StorageLocation &
 CachedConstAccessorsLattice<Base>::getOrCreateConstMethodReturnStorageLocation(
     const RecordStorageLocation &RecordLoc, const FunctionDecl *Callee,
-    Environment &Env, llvm::function_ref<void(StorageLocation &)> Initialize) {
+    const Expr &CallE, Environment &Env,
+    llvm::function_ref<void(StorageLocation &)> Initialize) {
   assert(Callee != nullptr);
   QualType Type = Callee->getReturnType();
   assert(!Type.isNull());
@@ -206,7 +229,14 @@ CachedConstAccessorsLattice<Base>::getOrCreateConstMethodReturnStorageLocation(
   if (it != ObjMap.end())
     return *it->second;
 
-  StorageLocation &Loc = Env.createStorageLocation(Type.getNonReferenceType());
+  // Use a stable location so that the environment stabilizes across loop
+  // iterations: a reference bound to the result in a loop body must refer to
+  // the same location in every iteration, otherwise joins at loop heads drop
+  // it. The call may have been evaluated before (e.g. in a previous iteration),
+  // so clear any stale values before initializing it.
+  StorageLocation &Loc = Env.getDataflowAnalysisContext().getStableStorageLocation(
+      RecordLoc, CallE, Type.getNonReferenceType());
+  internal::clearValuesRecursively(Loc, Env);
   Initialize(Loc);
 
   ObjMap.insert({Callee, &Loc});

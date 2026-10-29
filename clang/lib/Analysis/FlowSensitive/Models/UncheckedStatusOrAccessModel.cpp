@@ -924,7 +924,8 @@ static bool doHandleConstAccessorMemberCall(
     return false;
   StorageLocation &Loc =
       State.Lattice.getOrCreateConstMethodReturnStorageLocation(
-          *RecordLoc, DirectCallee, State.Env, [&](StorageLocation &Loc) {
+          *RecordLoc, DirectCallee, *Expr, State.Env,
+          [&](StorageLocation &Loc) {
             if (isStatusOrType(Expr->getType()))
               initializeStatusOr(cast<RecordStorageLocation>(Loc), State.Env);
           });

@@ -640,7 +640,7 @@ bool handleConstMemberCall(const CallExpr *CE,
     };
     StorageLocation &Loc =
         State.Lattice.getOrCreateConstMethodReturnStorageLocation(
-            *RecordLoc, DirectCallee, State.Env, Init);
+            *RecordLoc, DirectCallee, *CE, State.Env, Init);
 
     State.Env.setStorageLocation(*CE, Loc);
     return true;
@@ -662,7 +662,8 @@ bool handleConstMemberCall(const CallExpr *CE,
       return false;
     StorageLocation &Loc =
         State.Lattice.getOrCreateConstMethodReturnStorageLocation(
-            *RecordLoc, DirectCallee, State.Env, [&](StorageLocation &Loc) {
+            *RecordLoc, DirectCallee, *CE, State.Env,
+            [&](StorageLocation &Loc) {
               setHasValue(cast<RecordStorageLocation>(Loc),
                           State.Env.makeAtomicBoolValue(), State.Env);
             });

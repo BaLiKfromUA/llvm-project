@@ -133,6 +133,17 @@ DataflowAnalysisContext::getStableStorageLocation(const Expr &E) {
   return Loc;
 }
 
+StorageLocation &DataflowAnalysisContext::getStableStorageLocation(
+    const RecordStorageLocation &RecordLoc, const Expr &E, QualType Type) {
+  const Expr &CanonE = ignoreCFGOmittedNodes(E);
+
+  StorageLocation *&Loc = ConstMethodCallToLoc[{&RecordLoc, &CanonE}];
+  if (Loc == nullptr)
+    Loc = &createStorageLocation(Type);
+  assert(Loc->getType().getCanonicalType() == Type.getCanonicalType());
+  return *Loc;
+}
+
 PointerValue &
 DataflowAnalysisContext::getOrCreateNullPointerValue(QualType PointeeType) {
   auto CanonicalPointeeType =
